@@ -1,0 +1,625 @@
+---
+title: "30-exploration"
+output: html_notebook
+---
+
+
+```{r choropleth map of Human freedom score 2016}
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.9)
+# specify map projection/options
+g <- list(
+showframe = FALSE,
+showcoastlines = FALSE,
+projection = list(type = 'Mercator')
+)
+
+plot_geo(score16) %>%
+
+add_trace(
+z = ~ round(hf_score, 2), color = ~hf_score, colors = 'Blues', 
+text = ~countries, locations = ~ISO_code, marker = list(line = l)) %>%
+colorbar(title = 'Human Freedom \nScore, 2016') %>%
+layout(
+title = 'Human Freedom Score, 2016',
+geo = g
+)
+```
+
+
+```{r choropleth map of Human freedom score 2008}
+l <- list(color = toRGB("grey"), width = 0.9)
+# specify map projection/options
+g <- list(
+showframe = FALSE,
+showcoastlines = FALSE,
+projection = list(type = 'Mercator')
+)
+
+plot_geo(score08) %>%
+
+add_trace(
+z = ~ round(hf_score, 2), color = ~hf_score, colors = 'Blues', 
+text = ~countries, locations = ~ISO_code, marker = list(line = l)) %>%
+colorbar(title = 'Human Freedom \nScore, 2008') %>%
+layout(
+title = 'Human Freedom Score, 2008',
+geo = g
+)
+```
+
+
+```{r world map of changes in scores from 2008 to 2016}
+ggplotchange <- ggplot(data = map.world.change, aes(x = long, y = lat, group= group, fill = human_freedom_score, text =  paste("country:", region, "<br>", "personal_freedom_score:", personal_freedom_score, "<br>", "personal_freedom_rank:", personal_freedom_rank, "<br>", "economy_freedom_score:", economy_freedom_score, "<br>", "economy_freedom_rank:", economy_freedom_rank, "<br>", "human_freedom_score:", human_freedom_score, "<br>", "human_freedom_rank:", human_freedom_rank))) +
+  geom_polygon() +
+  scale_fill_gradient2(low = "#383C46", high = "#D4DBEA", mid="#5A76AF", name="Change of \nFreedom Score") +
+  theme(panel.background =  element_rect(fill = "white", colour = "grey50"),
+        panel.grid = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        legend.justification = "top",
+        plot.title = element_text(hjust = 0.5)) +
+  labs(title = "Changes from 2008 to 2016") #+
+  #guides(fill = guide_legend(title=NULL))
+ggplotly(ggplotchange, tooltip = c("text"))
+```
+
+
+```{r world human freedom rank in 2016 }
+str(score16)
+p <- ggplot(score16, aes(x=hf_score ,y=reorder(countries,hf_rank))) + 
+  geom_point(colour = "red", alpha = .5) + 
+  geom_segment(aes(yend=reorder(countries,hf_rank)), xend = 0, colour="pink", alpha = .5) + 
+  theme(axis.text.y = element_text(angle = 0, hjust = 1)) + 
+  labs(title = "World Human Freedom Rank in 2016", y = "Country Name", x = "Human Freedom Rank")
+ggplotly(p)
+```
+
+
+```{r regional analysis}
+score = hfi %>% filter(year == 2016) %>% select(pf_ss_women, ISO_code, countries, region, pf_score, pf_rank, ef_score, ef_rank, hf_score, hf_rank) %>%  na.omit()
+p1 =ggplot(score, aes(x = ef_score, y = pf_score, color = region), group = countries)
+
+pointsToLabel <- c("Russia", "Venezuela", "Iraq", "Myanmar", "Sudan",
+                   "Afghanistan", "Congo", "Greece", "Argentina", "Brazil",
+                   "India", "Italy", "China", "South Africa", "Spain",
+                   "Botswana", "Cape Verde", "Bhutan", "Rwanda", "France",
+                   "United States", "Germany", "Britain", "Barbados", "Norway", "Japan",
+                   "New Zealand", "Singapore")
+mR2 <- summary(lm(pf_score ~ 1 + ef_score , data = score))$r.squared
+mR2 <- paste0(format(mR2, digits = 2))
+
+p2 = p1 + geom_smooth(mapping = aes(linetype = "r2"),
+              method = "lm",se = FALSE,
+              color = "red") + # geom_point(size = 2, stroke = 1.25) +
+  geom_point(aes(size = round(pf_ss_women)), alpha = 0.6)+ labs(size = "Women Security Score") + 
+  geom_text_repel(aes(label = countries) , color = "black", size = 2.5, data = filter(score, countries %in% pointsToLabel), force = 2 ) + #check_overlap = TRUE
+  scale_x_continuous(name = "Economic Freedom Score, 2016 (10 = Most Free)", limits = c(2.5,9.5), breaks = 2.5:9.5) +
+  scale_y_continuous(name = "Personal Freedom Score, 2016 (10 = Most Free)", limits = c(2.5,9.5), breaks = 2.5:9.5) +
+  scale_color_brewer(name = "" , type = 'div', palette = 'Spectral') +
+  scale_linetype(name = "",
+                 breaks = "r2",
+                 labels = list(bquote(R^2==.(mR2))),
+                 guide = guide_legend(override.aes = list(linetype = 1, size = 2, color = "red"), order=2)) +
+  ggtitle("Economic & Personal Freedom and Women Security 2016") +
+  theme_minimal() + # start with a minimal theme and add what we need
+  theme(text = element_text(color = "gray20"),
+        legend.text = element_text(size = 10, color = "gray10"),
+        axis.text = element_text(face = "italic"),
+        axis.title.x = element_text(vjust = -1), # move title away from axis
+        axis.title.y = element_text(vjust = 2), # move away for axis
+        axis.ticks.y = element_blank(), # element_blank() is how we remove elements
+        axis.line = element_line(color = "gray40", size = 0.3),
+        #panel.grid.major = element_blank()
+        #axis.line.y = element_blank()
+        panel.grid.major = element_line(color = "gray", size = 0.2)
+        #panel.grid.major.x = element_blank()
+        )
+  
+
+suppressWarnings(print(p2))
+```
+
+
+
+```{r 2008 personal freedom}
+df = hfi %>% filter(year == 2008) %>% select(year, ISO_code, countries, region, starts_with('pf_'))
+
+df=df[,colSums(is.na(df))<nrow(df)]
+
+df = df %>% na.omit()
+cormat <- round(cor(df[,5:57]),2)
+
+#
+get_lower_tri<-function(cormat){
+  cormat[upper.tri(cormat)] <- NA
+  return(cormat)
+}
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  return(cormat)
+}
+
+reorder_cormat <- function(cormat){
+  # Use correlation between variables as distance
+  dd <- as.dist((1-cormat)/2) 
+  hc <- hclust(dd)
+  cormat <-cormat[hc$order, hc$order]
+}
+```
+
+```{r correlation Heatmap}
+cormat <- reorder_cormat(cormat)
+upper_tri <- get_upper_tri(cormat)
+# Melt the correlation matrix
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+# Create a ggheatmap
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Pearson\nCorrelation") +
+  theme_minimal()+ # minimal theme
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 8.5, hjust = 1), 
+        panel.grid.major = element_line(color = "gray", size = 0.2)) +
+  coord_fixed()
+
+ggheatmap + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_line(color = "gray", size = 0.2),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank()
+    ) + ggtitle("Personal Freedom, 2008")
+```
+
+
+# Exploration of how West Regions related to presonal and ecomnomic freedom
+```{r summary_west}
+summary(hfi_west)
+# Montengro is the only western country without data for these varaibles
+hfi_west <- hfi_west[-which(hfi_west$x1 == "Montenegro"),]
+cor(hfi_west[5:12], hfi_west$personal_freedom)
+```
+
+```{r pf_west}
+hfi_west %>%
+  ggplot(aes(region, personal_freedom)) + geom_boxplot()
+```
+
+```{r ef_west}
+hfi_west %>%
+  ggplot(aes(region, economic_freedom)) + geom_boxplot()
+```
+
+
+# Time Series
+
+```{r largest_change}
+#head(filteredchange)
+
+filteredchange %>%
+  ggplot(aes(x = year, y = pf_ss, group = countries)) +
+  geom_line(alpha = 0.2, size = 0.1) +
+  labs(title = "Countries with the Largest Positive Change in Safety and Security in Any Given Year",
+       x = "Year",
+       y = "Saftey and Security Score") +
+  theme_light() +
+  geom_line(data = subset(filteredchange, countries %in% inc_ss), aes(color = countries), size = 1.5, alpha = 0.7)
+
+#filteredchange %>% filter(countries %in% inc_ss, year == 2016) %>% group_by(region) %>% summarize(mean = mean(pf_ss), n = n())
+
+filteredchange %>%
+  ggplot(aes(x = year, y = pf_ss, group = countries)) +
+  geom_line(alpha = 0.2, size = 0.1) +
+  labs(title = "Countries with the Largest Negative Change in Safety and Security in Any Given Year",
+       x = "Year",
+       y = "Saftey and Security Score") +
+  theme_light() +
+  geom_line(data = subset(filteredchange, countries %in% dec_ss), aes(color = countries), size = 1.5, alpha = 0.7)
+
+#filteredchange %>% filter(countries %in% dec_ss, year == 2016) %>% group_by(region) %>% summarize(mean = mean(pf_ss), n = n())
+
+filteredchange %>%
+  ggplot(aes(x = year, y = pf_ss_women, group = countries)) +
+  geom_line(alpha = 0.2, size = 0.1) +
+  labs(title = "Countries with the Largest Positive Change in Women's Safety and Security in Any Given Year",
+       x = "Year",
+       y = "Women's Saftey and Security Score") +
+  theme_light() +
+  geom_line(data = subset(filteredchange, countries %in% inc_ss_women), aes(color = countries), size = 1.5, alpha = 0.7)
+
+filteredchange %>%
+  ggplot(aes(x = year, y = pf_ss_women, group = countries)) +
+  geom_line(alpha = 0.2, size = 0.1) +
+  labs(title = "Countries with the Largest Negative Change in Women's Safety and Security in Any Given Year",
+       x = "Year",
+       y = "Women's Saftey and Security Score") +
+  theme_light() +
+  geom_line(data = subset(filteredchange, countries %in% dec_ss_women), aes(color = countries), size = 1.5, alpha = 0.7)
+```
+
+```{r region_average}
+
+data_by_year %>%
+  ggplot(aes(x = year, y = avg_pf_ss, group = region)) +
+  geom_line(aes(color = region), size = 1.25, alpha = 0.5) +
+  labs(title = "Average Safety and Security by Region", x = "Year", y = "Safety and Security Score", fill = "Region") +
+  scale_y_continuous(breaks = seq(6,10,0.5)) +
+  theme_light() 
+
+
+data_by_year %>%
+  ggplot(aes(x = year, y = avg_pf_ss_women, group = region)) +
+  geom_line(aes(color = region), size = 1.25, alpha = 0.5) +
+  labs(title = "Average Safety and Security of Women by Region", x = "Year", y = "Safety and Security Score", fill = "Region") +
+  scale_y_continuous(breaks = seq(6,10,0.5)) +
+  theme_light()
+```
+
+
+```{r compare_variables}
+data_by_year %>%
+  filter(year == 2016, region %in% c("North America", "Western Europe", "Eastern Europe", "Latin America & the Caribbean")) %>%
+  select(region, avg_pf_ss, avg_pf_ss_women) %>% melt %>%
+  ggplot(aes(region, value, fill = variable)) + geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Region", y = "Safety and Security Score", title = "2016 Overall and Women's Safety and Security By Region (Western Hemisphere)", fill = "Variable") + scale_fill_manual(labels = c("Average Overall Security", "Average Women's Security"), values = c("Red", "Blue"))
+
+data_by_year %>%
+  filter(year == 2016, region %in% c("South Asia", "Oceania", "East Asia", "Caucasus & Central Asia", "Middle East & North Africa", "Sub-Saharan Africa")) %>%
+  select(region, avg_pf_ss, avg_pf_ss_women) %>% melt %>%
+  ggplot(aes(region, value, fill = variable)) + geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Region", y = "Safety and Security Score", title = "2016 Overall and Women's Safety and Security By Region (Eastern Hemishpere)", fill = "Variable") + scale_fill_manual(labels = c("Average Overall Security", "Average Women's Security"), values = c("Red", "Blue"))
+
+#unique(data_by_year$region)
+  
+```
+
+
+```{r pf_vs_ef_vs_ws}
+ggplot(data = hfi16, aes(x = pf_score, y = ef_score)) + 
+  geom_point(aes(col = pf_ss_women)) +
+  labs(x = "Personal Freedom Score", y = "Economic Freedom Score", main = "Personal and Economic Freedom and Women Security", color = "Security of Women")
+```
+
+
+```{r world human freedom rank in 2016 }
+str(score16)
+p <- ggplot(score16, aes(x=hf_score ,y=reorder(countries,hf_rank))) + 
+  geom_point(colour = "red", alpha = .5) + 
+  geom_segment(aes(yend=reorder(countries,hf_rank)), xend = 0, colour="pink", alpha = .5) + 
+  theme(axis.text.y = element_text(angle = 0, hjust = 1)) + 
+  labs(title = "World Human Freedom Rank in 2016", y = "Country Name", x = "Human Freedom Rank")
+ggplotly(p)
+```
+
+
+```{r 2016 women Personal Freedom vs Economic Freedom}
+score = hfi %>% filter(year == 2016) %>% select(pf_ss_women, ISO_code, countries, region, pf_score, pf_rank, ef_score, ef_rank, hf_score, hf_rank) %>%  na.omit()
+p1 =ggplot(score, aes(x = ef_score, y = pf_score, color = region), group = countries)
+
+pointsToLabel <- c("Russia", "Venezuela", "Iraq", "Myanmar", "Sudan",
+                   "Afghanistan", "Congo", "Greece", "Argentina", "Brazil",
+                   "India", "Italy", "China", "South Africa", "Spain",
+                   "Botswana", "Cape Verde", "Bhutan", "Rwanda", "France",
+                   "United States", "Germany", "Britain", "Barbados", "Norway", "Japan",
+                   "New Zealand", "Singapore")
+mR2 <- summary(lm(pf_score ~ 1 + ef_score , data = score))$r.squared
+mR2 <- paste0(format(mR2, digits = 2))
+
+p2 = p1 + geom_smooth(mapping = aes(linetype = "r2"),
+              method = "lm",se = FALSE,
+              color = "red") + # geom_point(size = 2, stroke = 1.25) +
+  geom_point(aes(size = round(pf_ss_women)), alpha = 0.6)+ labs(size = "Women Security Score") + 
+  geom_text_repel(aes(label = countries) , color = "black", size = 2.5, data = filter(score, countries %in% pointsToLabel), force = 2 ) + #check_overlap = TRUE
+  scale_x_continuous(name = "Economic Freedom Score, 2016 (10 = Most Free)", limits = c(2.5,9.5), breaks = 2.5:9.5) +
+  scale_y_continuous(name = "Personal Freedom Score, 2016 (10 = Most Free)", limits = c(2.5,9.5), breaks = 2.5:9.5) +
+  scale_color_brewer(name = "" , type = 'div', palette = 'Spectral') +
+  scale_linetype(name = "",
+                 breaks = "r2",
+                 labels = list(bquote(R^2==.(mR2))),
+                 guide = guide_legend(override.aes = list(linetype = 1, size = 2, color = "red"), order=2)) +
+  ggtitle("Economic & Personal Freedom and Women Security 2016") +
+  theme_minimal() + # start with a minimal theme and add what we need
+  theme(text = element_text(color = "gray20"),
+        legend.text = element_text(size = 10, color = "gray10"),
+        axis.text = element_text(face = "italic"),
+        axis.title.x = element_text(vjust = -1), # move title away from axis
+        axis.title.y = element_text(vjust = 2), # move away for axis
+        axis.ticks.y = element_blank(), # element_blank() is how we remove elements
+        axis.line = element_line(color = "gray40", size = 0.3),
+        #panel.grid.major = element_blank()
+        #axis.line.y = element_blank()
+        panel.grid.major = element_line(color = "gray", size = 0.2)
+        #panel.grid.major.x = element_blank()
+        )
+  
+
+suppressWarnings(print(p2))
+```
+
+
+```{r 2008 personal freedom}
+df = hfi %>% filter(year == 2008) %>% select(year, ISO_code, countries, region, starts_with('pf_'))
+
+df=df[,colSums(is.na(df))<nrow(df)]
+
+df = df %>% na.omit()
+cormat <- round(cor(df[,5:57]),2)
+
+#
+get_lower_tri<-function(cormat){
+  cormat[upper.tri(cormat)] <- NA
+  return(cormat)
+}
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  return(cormat)
+}
+
+reorder_cormat <- function(cormat){
+  # Use correlation between variables as distance
+  dd <- as.dist((1-cormat)/2) 
+  hc <- hclust(dd)
+  cormat <-cormat[hc$order, hc$order]
+}
+```
+
+```{r correlation Heatmap}
+cormat <- reorder_cormat(cormat)
+upper_tri <- get_upper_tri(cormat)
+# Melt the correlation matrix
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+# Create a ggheatmap
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Pearson\nCorrelation") +
+  theme_minimal()+ # minimal theme
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 8.5, hjust = 1), 
+        panel.grid.major = element_line(color = "gray", size = 0.2)) +
+  coord_fixed()
+
+ggheatmap + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_line(color = "gray", size = 0.2),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank()
+    ) + ggtitle("Personal Freedom, 2008")
+
+```
+
+
+
+```{r kmeans_analysis}
+hfi16 = hfi[hfi$year == 2016,]
+hfi16 <- hfi16 %>% select(year, X1 = countries, region, pf_ss, pf_rol, pf_religion, pf_association, pf_identity, pf_expression, pf_score, pf_movement, ef_government, ef_legal, ef_score, ef_regulation, ef_money, ef_trade, contains("women"), pf_identity_sex_female, pf_identity_divorce)
+hfi16 <- hfi16[-which(is.na(hfi16[4:26])),] %>% na.omit()
+set.seed(1235) 
+clusters <- hfi16 %>% select(contains("women")) %>% na.omit()
+k3 <- kmeans(clusters, 3)
+k3
+fviz_cluster(k3, data = clusters)
+fviz_nbclust(clusters, kmeans, method = "wss")
+hfi16$clusters <- as.factor(k3$cluster)
+hfi16$regionf <- factor(hfi16$region)
+```
+
+```{r corrplot}
+corr <- round(cor(na.omit(hfi16[4:26])), 1)
+ggcorrplot(corr, hc.order = TRUE, method = "circle", lab = TRUE, lab_size = 3)
+```
+
+```{r}
+hfi16 <- hfi16 %>%
+  group_by(clusters) %>%
+  mutate(clusteravgwss = mean(pf_ss_women), clustersdwss = sd(pf_ss_women), clusteravgss = mean(pf_ss), clustersdss = sd(pf_ss))
+```
+
+```{r ws_vs_religion}
+ggplot(data = hfi16, aes(y = pf_ss_women, x = pf_religion)) +
+  scale_shape_manual(values = 1:nlevels(hfi16$regionf)) +
+  geom_jitter(aes(color = clusters, shape = regionf)) +
+  labs(col = "Clusters",
+       shape = "Regions",
+       x = "Religious Freedom",
+       y = "Security of Women") +
+  geom_text_repel(
+    data = subset(hfi16, pf_ss_women  < (clusteravgwss - clustersdwss)),
+    aes(
+      x = pf_religion,
+      y = pf_ss_women,
+      label = X1,
+      color =
+        clusters
+    ),
+    nudge_y = .5
+  )
+```
+
+```{r ws_vs_rol}
+ggplot(data = hfi16, aes(y = pf_ss_women, x = pf_rol)) +
+  scale_shape_manual(values = 1:nlevels(hfi16$regionf)) +
+  geom_jitter(aes(color = clusters, shape = regionf)) +
+  labs(col = "Clusters",
+       shape = "Regions",
+       x = "Rule of Law",
+       y = "Security of Women") +
+  geom_text_repel(
+    data = subset(hfi16, pf_ss_women  < (clusteravgwss - clustersdwss)),
+    aes(
+      x = pf_rol,
+      y = pf_ss_women,
+      label = X1,
+      color =
+        clusters
+    ),
+    nudge_y = .5
+  )
+```
+
+```{r ws_vs_efscore}
+ggplot(data = hfi16, aes(y = pf_ss_women, x = ef_score)) +
+  scale_shape_manual(values = 1:nlevels(hfi16$regionf)) +
+  geom_jitter(aes(color = clusters, shape = regionf)) +
+  labs(col = "Clusters",
+       shape = "Regions",
+       x = "Economic Freedom Score",
+       y = "Security of Women") +
+  geom_text_repel(
+    data = subset(hfi16, pf_ss_women  < (clusteravgwss - clustersdwss)),
+    aes(
+      x = ef_score,
+      y = pf_ss_women,
+      label = X1,
+      color =
+        clusters
+    ),
+    nudge_y = .5
+  )
+```
+
+```{r ws_vs_efmoney}
+ggplot(data = hfi16, aes(y = pf_ss_women, x = ef_money)) +
+  scale_shape_manual(values = 1:nlevels(hfi16$regionf)) +
+  geom_jitter(aes(color = clusters, shape = regionf)) +
+  labs(col = "Clusters",
+       shape = "Regions",
+       x = "Access to Sound Money",
+       y = "Security of Women") +
+  geom_text_repel(
+    data = subset(hfi16, pf_ss_women  < (clusteravgwss - clustersdwss)),
+    aes(
+      x = ef_money,
+      y = pf_ss_women,
+      label = X1,
+      color =
+        clusters
+    ),
+    nudge_y = .5
+  )
+```
+
+```{r ws_vs_pfidentity}
+ggplot(data = hfi16, aes(y = pf_ss_women, x = pf_identity)) +
+  scale_shape_manual(values = 1:nlevels(hfi16$regionf)) +
+  geom_jitter(aes(color = clusters, shape = regionf)) +
+  labs(col = "Clusters",
+       shape = "Regions",
+       x = "Access to Divorce",
+       y = "Security of Women") +
+  geom_text_repel(
+    data = subset(hfi16, pf_ss_women  < (clusteravgwss - clustersdwss)),
+    aes(
+      x = pf_identity,
+      y = pf_ss_women,
+      label = X1,
+      color =
+        clusters
+    ), nudge_y = .5
+  )
+```
+
+```{r ws_vs_pfscore}
+ggplot(data = hfi16, aes(y = pf_ss_women, x = pf_score)) +
+  scale_shape_manual(values = 1:nlevels(hfi16$regionf)) +
+  geom_jitter(aes(color = clusters, shape = regionf)) +
+  labs(col = "Clusters",
+       shape = "Regions",
+       x = "Personal Freedom Score",
+       y = "Security of Women") +
+  geom_text_repel(
+    data = subset(hfi16, pf_ss_women  < (clusteravgwss - clustersdwss)),
+    aes(
+      x = pf_score,
+      y = pf_ss_women,
+      label = X1,
+      color =
+        clusters
+    ), nudge_y = .5
+  )
+```
+
+```{r ws_vs_general_security}
+ggplot(data = hfi16, aes(y = pf_ss_women, x = pf_ss)) +
+  scale_shape_manual(values = 1:nlevels(hfi16$regionf)) +
+  geom_jitter(aes(color = clusters, shape = regionf)) +
+  labs(col = "Clusters",
+       shape = "Regions",
+       x = "General Security",
+       y = "Security of Women") +
+  geom_text_repel(
+    data = subset(hfi16, pf_ss  < (clusteravgss - clustersdss)),
+    aes(
+      x = pf_ss,
+      y = pf_ss_women,
+      label = X1,
+      color =
+        clusters
+    ), nudge_y = .5
+  )
+```
+
+```{r}
+perc <- hfi16 %>% group_by(clusters) %>% mutate(ninclust = n()) %>% ungroup()
+perc <- perc %>% group_by(region) %>% mutate(ninregion = n()) %>% ungroup()
+```
+
+
+```{r generate matrix for clusters}
+hfi16 = hfi[hfi$year == 2016,]
+hfi16 <- hfi16 %>% select(year, X1=countries,ISO_code, region, pf_ss, pf_rol, pf_religion, pf_association, pf_identity, pf_expression, pf_score, pf_movement, ef_government, ef_legal, ef_score,pf_ss_women_fgm,pf_ss_women_missing,pf_ss_women_inheritance_widows,pf_ss_women_inheritance_daughters, pf_ss_women_inheritance,pf_identity_sex_female, pf_identity_divorce,pf_ss_women)
+hfi16 <- na.omit(hfi16)
+
+set.seed(1235)
+clusters <- hfi16 %>% select(contains("women")) 
+
+hfi16$clusters <- as.factor(k3$cluster)
+```
+
+```{r countries and their clusters}
+hfi16 %>% 
+  select(X1,clusters)
+
+l <- list(color = clusters, width = 0.5)
+g <- list(
+showframe = TRUE,
+showcoastlines = TRUE,
+scope="world",
+projection = list(type = 'Mercator')
+)
+```
+
+
+```{r clusters on world map}
+hfi16$clusters <- as.factor(hfi16$clusters)
+plot_geo(hfi16) %>%
+add_trace(z = ~clusters,
+text = ~X1, locations = ~ISO_code, marker = list(line = l,inherit = TRUE)
+) %>%
+colorbar(title="") %>% 
+layout(
+title = 'Women Freedom Clusters World Map',
+geo = g
+)
+```
+
+
+
+
+
+
+
+
+
+
+

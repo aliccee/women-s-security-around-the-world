@@ -1,0 +1,38 @@
+---
+title: "10-import"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r load packages}
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(data.table)
+library(ggrepel)
+library(janitor)
+library(assertr)
+library(htmltools)
+library(corrplot)
+library(plotly)
+library(ggplot2)
+library(factoextra)
+library(ggcorrplot)
+library(stats)
+library(tidyr)
+library(reshape2)
+```
+
+```{r load files}
+hfi <- read_csv("data/hfi_cc_2018.csv")
+country <- read_csv("data/country.csv")
+```
+
+```{r create_dataframes}
+hfi_women <- hfi %>% select(year, X1 = countries, region, contains("women")) %>% filter(year == 2016)
+hfiwc <- full_join(hfi_women, country)
+hfi16 = hfi[hfi$year == 2016,]
+```
+
+

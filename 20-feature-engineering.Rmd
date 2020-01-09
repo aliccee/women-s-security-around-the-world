@@ -1,0 +1,135 @@
+---
+title: "20-feature-engineering"
+output: html_notebook
+---
+
+```{r averages}
+hfi16 %>% group_by(region) %>% summarize(avgwss = mean(pf_ss_women, na.rm = TRUE))
+hfi16 %>% group_by(region) %>% summarize(avgrol = mean(pf_rol, na.rm = TRUE))
+```
+
+```{r freedom score of 2008 and 2016}
+score16 = hfi %>% filter(year == 2016) %>% select(ISO_code, countries, region, pf_score, pf_rank, ef_score, ef_rank, hf_score, hf_rank) %>%  na.omit()
+p1 =ggplot(score16, aes(x = ef_score, y = pf_score, color = region), group = countries)
+
+score08 = hfi %>% filter(year == 2008) %>% select(ISO_code, countries, region, pf_score, pf_rank, ef_score, ef_rank, hf_score, hf_rank) %>%  na.omit()
+p1 =ggplot(score08, aes(x = ef_score, y = pf_score, color = region), group = countries)
+```
+
+```{r changes in scores from 2008 to 2016}
+df.change <- left_join(score16,score08,by="countries")
+str(df.change)
+df.change <- mutate(df.change,
+                    pf.score.diff = pf_score.x-pf_score.y,
+                    pf.rank.diff = pf_rank.x-pf_rank.y,
+                    ef.score.diff = ef_score.x-ef_score.y,
+                    ef.rank.diff = ef_rank.x-ef_rank.y,
+                    hf.score.diff = hf_score.x-hf_score.y,
+                    hf.rank.diff = hf_rank.x-hf_rank.y)
+
+df.change <- select(df.change, countries, region.x, pf.score.diff, pf.rank.diff, ef.score.diff, ef.rank.diff, hf.score.diff, hf.rank.diff)
+names(df.change) <- c("country", "region", "personal_freedom_score", "personal_freedom_rank", "economy_freedom_score", "economy_freedom_rank", "human_freedom_score", "human_freedom_rank")
+
+for (i in 1:6) {
+df.change[,i+2] <- round(df.change[,i+2], 3)
+}
+na.omit(df.change)
+```
+
+```{r join the worldmap and the changes in scores}
+map.world <- map_data("world")
+map.world.change <- left_join(map.world, df.change, by = c('region' = 'country'))
+```
+
+# West Region 
+```{r datasets}
+hfi_women <- hfi %>% select(year, X1 = countries, region, contains("women")) %>% filter(year == 2016)
+
+hfiwc <- full_join(hfi_women, country)
+
+head(hfiwc)
+```
+
+```{r west_regions}
+hfi_west <- hfiwc %>%
+  filter(region %in% c("Eastern Europe", "Western Europe", "North America"))
+
+hfi_west <- hfi_west %>% clean_names()
+```
+
+
+# Time Series
+
+We are going to create two datasets of the same variables becuase we will use them differently, adding mutated columns on them for different visualizations
+```{r data_visual}
+filteredchange <- hfi %>% select(countries, year, pf_ss, pf_ss_women, region) %>% arrange(countries, year)
+time <- hfi %>% select(countries, year, pf_ss, pf_ss_women, region) %>% arrange(countries, year)
+```
+
+Grouping the average safety and security scores by region and year. This will allow us to plot line graphs by region instead of by contry, as well as compare the two variables of average overall safety and security in a region, and women's safety and security in a region.
+```{r by_year}
+data_by_year <- time %>% group_by(region, year) %>% summarize(avg_pf_ss = mean(pf_ss, na.rm = T), avg_pf_ss_women = mean(pf_ss_women, na.rm = T))
+
+head(data_by_year)
+```
+
+
+
+Generating top 10 lists for countries with the largest postive and negative change safety and security in any given year. I will pass the vectors containing these countries so I can highlight them in the spaghetti plots created later
+```{r add_change}
+#names(hfi)
+#head(time)
+
+#`%notin%` <- Negate(`%in%`)
+
+#%>% filter(countries %notin% filteredchange[which(is.na(time$pf_ss)),]$countries)
+
+filteredchange$change_ss <- NA
+filteredchange$change_ss_women <- NA
+for(i in 2:nrow(filteredchange))
+{
+  if(filteredchange$countries[i] == filteredchange$countries[i - 1])
+  {
+    filteredchange$change_ss[i] <- filteredchange$pf_ss[i] - filteredchange$pf_ss[i - 1]
+    filteredchange$change_ss_women[i] <- filteredchange$pf_ss_women[i] - filteredchange$pf_ss_women[i - 1]
+  }
+}
+
+filteredchange %>% arrange(desc(change_ss))
+filteredchange %>% arrange(desc(change_ss_women))
+filteredchange %>% arrange(change_ss)
+filteredchange %>% arrange(change_ss_women)
+
+inc_ss <- c("Sri Lanka", "Seychelles", "Guyana", "Ukraine", "Chad", "Qatar", "United Arab Emirates", "Lebanon", "Georgia", "Burundi")
+
+inc_ss_women <- c("Qatar", "South Africa", "United Arab Emirates", "Namibia", "Trinidad and Tobago", "Nepal", "Taiwan", "Zambia", "Malawi", "Congo, Rep. Of") 
+
+dec_ss <- c("Ukraine", "Brunei Darussalam","Yemen, Rep.", "Bahamas",  "Lebanon", "Kyrgyz Republic", "Cameroon", "Timor-Leste", "Chad",  "Syria")
+
+dec_ss_women <- c("Brunei Darussalam", "Suriname", "Madagascar", "United Arab Emirates", "Azerbaijan", "Georgia", "Macdonia", "Singapore", "Malawi", "Yemen, Rep.")
+```
+
+
+Mapping the average change in the overall safety and security, and women's safety and security from 2008 and 2010 by region. We never use the data for mapping but had an idea of comparing the magnitude that each region was changing with safety and security from one year to 2016.
+```{r compare_change}
+data816 <- time %>% filter(year %in% c(2008, 2016)) %>% 
+  pivot_wider(names_from = year, values_from = c(pf_ss, pf_ss_women)) %>% 
+  mutate(change_ss = pf_ss_2016 - pf_ss_2008, change_ss_women = pf_ss_women_2016 - pf_ss_women_2008) %>%
+  arrange(change_ss_women) %>% select(countries, region, change_ss_women, change_ss, everything())
+
+head(data816)
+
+d816sum <- data816 %>% group_by(region) %>% summarize(avg_change_ss_women_2008 = mean(change_ss_women, na.rm = T), avg_ss_women_2008 = mean(pf_ss_women_2008, na.rm = T), n = n())
+
+head(d816sum)
+
+data1016 <- time %>% filter(year %in% c(2010, 2016)) %>% 
+  pivot_wider(names_from = year, values_from = c(pf_ss, pf_ss_women)) %>% 
+  mutate(change_ss = pf_ss_2016 - pf_ss_2010, change_ss_women = pf_ss_women_2016 - pf_ss_women_2010) %>%
+  arrange(change_ss_women) %>% select(countries, region, change_ss_women, change_ss, everything())
+
+d1016sum <- data1016 %>% group_by(region) %>% summarize(avg_change_ss_women_2010 = mean(change_ss_women, na.rm = T), avg_ss_women_2010 = mean(pf_ss_women_2010, na.rm = T))  %>% left_join(d816sum, c("region" = "region")) %>% arrange(avg_ss_women_2010) %>%
+  select(region, avg_ss_women_2008, avg_ss_women_2010, avg_change_ss_women_2008, avg_change_ss_women_2010, n)
+
+d1016sum %>% select(avg_change_ss_women_2008, avg_ss_women_2010)
+```
